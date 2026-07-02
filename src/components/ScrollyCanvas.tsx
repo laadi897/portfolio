@@ -22,7 +22,7 @@ export default function ScrollyCanvas() {
     offset: ["start start", "end end"],
   });
 
-  // Map scroll progress (0-1) to frame index
+  // Map scroll progress (0-1) to frame index (0 - 70)
   const frameIndex = useTransform(scrollYProgress, [0, 1], [0, FRAME_COUNT - 1]);
 
   useEffect(() => {
@@ -32,18 +32,17 @@ export default function ScrollyCanvas() {
 
     for (let i = 0; i < FRAME_COUNT; i++) {
       const img = new Image();
-      img.src = getFramePath(i);
-      const checkLoaded = () => {
+      
+      const handleLoad = () => {
         loadedCount++;
         if (loadedCount === FRAME_COUNT) {
           setIsLoaded(true);
         }
       };
-      img.onload = checkLoaded;
-      img.onerror = () => {
-        console.error(`Failed to load frame ${i}`);
-        checkLoaded();
-      };
+
+      img.onload = handleLoad;
+      img.onerror = handleLoad; // Ensure loading screen disappears even if a frame fails
+      img.src = getFramePath(i);
       preloadedImages.push(img);
     }
     setImages(preloadedImages);
@@ -60,7 +59,7 @@ export default function ScrollyCanvas() {
     const unsubscribe = frameIndex.on("change", (latest) => {
       const currentFrame = Math.round(latest);
       const img = images[currentFrame];
-      
+
       if (img) {
         // Implement object-fit: cover logic
         const canvasRatio = canvas.width / canvas.height;
