@@ -26,26 +26,58 @@ export default function ScrollyCanvas() {
   const frameIndex = useTransform(scrollYProgress, [0, 1], [0, FRAME_COUNT - 1]);
 
   useEffect(() => {
+    let isMounted = true;
     // Preload images
     const preloadedImages: HTMLImageElement[] = [];
     let loadedCount = 0;
 
+    const checkLoaded = () => {
+      if (loadedCount >= FRAME_COUNT && isMounted) {
+        setIsLoaded(true);
+      }
+    };
+
     for (let i = 0; i < FRAME_COUNT; i++) {
       const img = new Image();
-      
-      const handleLoad = () => {
+
+      const handleComplete = () => {
+        img.onload = null;
+        img.onerror = null;
+        img.onabort = null;
         loadedCount++;
-        if (loadedCount === FRAME_COUNT) {
-          setIsLoaded(true);
-        }
+        checkLoaded();
       };
 
-      img.onload = handleLoad;
-      img.onerror = handleLoad; // Ensure loading screen disappears even if a frame fails
+      img.onload = handleComplete;
+      img.onerror = handleComplete;
+      img.onabort = handleComplete; // Catch browser aborted requests
+
       img.src = getFramePath(i);
+      
+      // Fix: If the image is instantly loaded from the browser cache, 
+      // the 'onload' event might not fire. We must check 'complete'.
+      if (img.complete) {
+        handleComplete();
+      }
+      
       preloadedImages.push(img);
     }
+
     setImages(preloadedImages);
+
+    // Root cause safety fallback: when flooding the browser with 120 concurrent requests,
+    // some requests can silently hang in "Pending" forever without firing error or abort.
+    // This timeout ensures the loading screen ALWAYS disappears.
+    const fallbackTimeout = setTimeout(() => {
+      if (isMounted) {
+        setIsLoaded(true);
+      }
+    }, 5000);
+
+    return () => {
+      isMounted = false;
+      clearTimeout(fallbackTimeout);
+    };
   }, []);
 
   useEffect(() => {
