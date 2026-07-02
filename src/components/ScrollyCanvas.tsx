@@ -53,13 +53,13 @@ export default function ScrollyCanvas() {
       img.onabort = handleComplete; // Catch browser aborted requests
 
       img.src = getFramePath(i);
-      
+
       // Fix: If the image is instantly loaded from the browser cache, 
       // the 'onload' event might not fire. We must check 'complete'.
       if (img.complete) {
         handleComplete();
       }
-      
+
       preloadedImages.push(img);
     }
 
@@ -90,12 +90,21 @@ export default function ScrollyCanvas() {
     // Draw the current frame when it changes
     const unsubscribe = frameIndex.on("change", (latest) => {
       const currentFrame = Math.round(latest);
-      const img = images[currentFrame];
 
-      if (img) {
+      // Fix: Find the last successfully loaded frame if the current one is broken/evicted
+      let validImg = null;
+      for (let i = currentFrame; i >= 0; i--) {
+        const img = images[i];
+        if (img && img.complete && img.naturalWidth > 0) {
+          validImg = img;
+          break;
+        }
+      }
+
+      if (validImg) {
         // Implement object-fit: cover logic
         const canvasRatio = canvas.width / canvas.height;
-        const imgRatio = img.width / img.height;
+        const imgRatio = validImg.width / validImg.height;
 
         let renderWidth = canvas.width;
         let renderHeight = canvas.height;
@@ -113,7 +122,7 @@ export default function ScrollyCanvas() {
         }
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+        ctx.drawImage(validImg, offsetX, offsetY, renderWidth, renderHeight);
       }
     });
 
@@ -123,10 +132,19 @@ export default function ScrollyCanvas() {
       canvas.height = window.innerHeight;
       // Trigger a redraw on resize
       const currentFrame = Math.round(frameIndex.get());
-      const img = images[currentFrame];
-      if (img && ctx) {
+
+      let validImg = null;
+      for (let i = currentFrame; i >= 0; i--) {
+        const img = images[i];
+        if (img && img.complete && img.naturalWidth > 0) {
+          validImg = img;
+          break;
+        }
+      }
+
+      if (validImg && ctx) {
         const canvasRatio = canvas.width / canvas.height;
-        const imgRatio = img.width / img.height;
+        const imgRatio = validImg.width / validImg.height;
 
         let renderWidth = canvas.width;
         let renderHeight = canvas.height;
@@ -141,7 +159,7 @@ export default function ScrollyCanvas() {
           offsetX = (canvas.width - renderWidth) / 2;
         }
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        ctx.drawImage(img, offsetX, offsetY, renderWidth, renderHeight);
+        ctx.drawImage(validImg, offsetX, offsetY, renderWidth, renderHeight);
       }
     };
 
